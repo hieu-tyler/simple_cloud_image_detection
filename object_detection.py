@@ -4,6 +4,11 @@ import sys
 import time
 import cv2
 import os
+import uuid
+import base64
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
 
 # construct the argument parse and parse the arguments
 confthres = 0.3
@@ -78,7 +83,7 @@ def do_prediction(image, net, LABELS):
             # filter out weak predictions by ensuring the detected
             # probability is greater than the minimum probability
             if confidence > confthres:
-                # scale the bounding box coordinates back relative to the
+                # scale the bofunding box coordinates back relative to the
                 # size of the image, keeping in mind that YOLO actually
                 # returns the center (x, y)-coordinates of the bounding
                 # box followed by the boxes' width and height
@@ -100,8 +105,9 @@ def do_prediction(image, net, LABELS):
     # apply non-maxima suppression to suppress weak, overlapping bounding boxes
     idxs = cv2.dnn.NMSBoxes(boxes, confidences, confthres, nmsthres)
 
-    # TODO Prepare the output as required to the assignment specification
+    # Prepare the output as required to the assignment specification
     # ensure at least one detection exists
+    output_obj = []
     if len(idxs) > 0:
         # loop over the indexes we are keeping
         for i in idxs.flatten():
@@ -115,17 +121,37 @@ def do_prediction(image, net, LABELS):
                     boxes[i][3],
                 )
             )
+            found_obj = {
+                "label": LABELS[classIDs[i]],
+                "accuracy": confidences[i],
+                "rectangle": {
+                    "height": boxes[i][0], 
+                    "left": boxes[i][1], 
+                    "top": boxes[i][2], 
+                    "width": boxes[i][3],
+                }
+            }
+            output_obj.append(found_obj)
+        print(output_obj)
 
+    client_obj = None
+    if output_obj:
+        client_obj = {
+            "id": str(uuid.uuid4()),
+            "object": output_obj,
+        }
+    print("client object", client_obj)
+    return client_obj
 
 ## argument
-if len(sys.argv) != 3:
-    raise ValueError(
-        "Argument list is wrong. Please use the following format:  {} {} {}".format(
-            "python iWebLens_server.py", "<yolo_config_folder>", "<Image file path>"
-        )
-    )
+# if len(sys.argv) != 3:
+#     raise ValueError(
+#         "Argument list is wrong. Please use the following format:  {} {} {}".format(
+#             "python iWebLens_server.py", "<yolo_config_folder>", "<Image file path>"
+#         )
+#     )
 
-yolo_path = str(sys.argv[1])
+yolo_path = "yolo_tiny_configs/"
 
 ## Yolov3-tiny versrion
 labelsPath = "coco.names"
@@ -137,7 +163,7 @@ CFG = get_config(cfgpath)
 weights = get_weights(wpath)
 
 
-# TODO, you should  make this console script into webservice using Flask
+# TODO, you should make this console script into webservice using Flask
 def main():
     try:
         imagefile = str(sys.argv[2])
@@ -145,14 +171,51 @@ def main():
         npimg = np.array(img)
         image = npimg.copy()
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        # load the neural net.  Should be local to this method as its multi-threaded endpoint
+        # Load the neural net. Should be local to this method as its multi-threaded endpoint
         nets = load_model(CFG, weights)
-        do_prediction(image, nets, labels)
+        client_obj = do_prediction(image, nets, labels)
+        if client_obj:
+            print(client_obj)
 
     except Exception as e:
+        print("Exception {}".format(e))
 
-        print("Exception  {}".format(e))
+@app.route('/', methods=['POST'])
+def upload_file():
+    if request.method == 'POST':
+        json = request.json
+        client_obj = None
+        if json:
+            img_object = json['image']
+            try:
+                image_data = base64.b64decode(img_object)
+                nparr = np.frombuffer(image_data, np.uint8)
+                image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                # TODO Load the neural net. Should be local to this method as its multi-threaded endpoint
+                nets = load_model(CFG, weights)
+                client_obj = do_prediction(image, nets, labels)
+                if json['id']:
+                    client_obj.update({
+                        "id": json['id']
+                    })
 
+            except Exception as e:
+                print("Exception {}".format(e))
+
+        elif request.files['file']:
+            file = request.files['file']
+            image_data = file.read()
+            try:
+                image = np.frombuffer(image_data, np.uint8)
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                # TODO Load the neural net. Should be local to this method as its multi-threaded endpoint
+                nets = load_model(CFG, weights)
+                client_obj = do_prediction(image, nets, labels)
+            except Exception as e:
+                print("Exception {}".format(e))
+
+        return jsonify(client_obj)
 
 if __name__ == "__main__":
-    main()
+    # main()
+    app.run(debug=True)
