@@ -7,6 +7,7 @@ import os
 import uuid
 import base64
 from flask import Flask, jsonify, request
+import threading
 
 app = Flask(__name__)
 
@@ -143,17 +144,9 @@ def do_prediction(image, net, LABELS):
     print("client object", client_obj)
     return client_obj
 
-## argument
-# if len(sys.argv) != 3:
-#     raise ValueError(
-#         "Argument list is wrong. Please use the following format:  {} {} {}".format(
-#             "python iWebLens_server.py", "<yolo_config_folder>", "<Image file path>"
-#         )
-#     )
-
 yolo_path = "yolo_tiny_configs/"
 
-## Yolov3-tiny versrion
+## Yolov3-tiny version
 labelsPath = "coco.names"
 cfgpath = "yolov3-tiny.cfg"
 wpath = "yolov3-tiny.weights"
@@ -193,7 +186,13 @@ def upload_file():
                 image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 # TODO Load the neural net. Should be local to this method as its multi-threaded endpoint
                 nets = load_model(CFG, weights)
-                client_obj = do_prediction(image, nets, labels)
+                thread = threading.Thread(target=do_prediction, args=(image, nets, labels))
+                thread.start()
+
+                # Wait for thread result
+                thread.join()
+                client_obj = thread.result
+
                 if json['id']:
                     client_obj.update({
                         "id": json['id']
@@ -210,12 +209,26 @@ def upload_file():
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 # TODO Load the neural net. Should be local to this method as its multi-threaded endpoint
                 nets = load_model(CFG, weights)
-                client_obj = do_prediction(image, nets, labels)
+                thread = threading.Thread(target=do_prediction, args=(image, nets, labels))
+                thread.start()
+
+                # Wait for the thread result
+                thread.join()
+                client_obj = thread.result
+
             except Exception as e:
                 print("Exception {}".format(e))
 
         return jsonify(client_obj)
 
 if __name__ == "__main__":
-    # main()
-    app.run(debug=True)
+    if len(sys.argv) == 3:
+        main()
+    elif len(sys.argv) == 1:
+        app.run(debug=True, threaded=True)
+    else:
+        raise ValueError(
+                "Argument list is wrong. Please use the following format:  {} {} {}".format(
+                    "python iWebLens_server.py", "<yolo_config_folder>", "<Image file path>"
+                )
+            )
