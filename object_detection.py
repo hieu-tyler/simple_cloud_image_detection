@@ -6,8 +6,9 @@ import cv2
 import os
 import uuid
 import base64
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 import threading
+from queue import Queue
 
 app = Flask(__name__)
 
@@ -173,25 +174,47 @@ def main():
     except Exception as e:
         print("Exception {}".format(e))
 
-@app.route('/', methods=['POST'])
+def process_image(image, nets, labels, result):
+    result.update({'client_obj': do_prediction(image, nets, labels)})
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/upload', methods=['POST'])
 def upload_file():
+    image_str = ""
+    if request.method == "POST":
+        if 'image' in request.files:
+            file = request.files['image']
+            image_data = file.read()
+            image_str = base64.b64encode(image_data).decode('utf-8')
+
+    return jsonify({
+        "id": str(uuid.uuid4()),
+        "image": image_str,
+    })
+
+@app.route('/detect', methods=['POST'])
+def detect_image():
     if request.method == 'POST':
         json = request.json
-        client_obj = None
+        client_obj = {}
         if json:
             img_object = json['image']
             try:
                 image_data = base64.b64decode(img_object)
                 nparr = np.frombuffer(image_data, np.uint8)
                 image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                # TODO Load the neural net. Should be local to this method as its multi-threaded endpoint
+                # TODO: Load the neural net. Should be local to this method as its multi-threaded endpoint
                 nets = load_model(CFG, weights)
-                thread = threading.Thread(target=do_prediction, args=(image, nets, labels))
+                
+                # Create a new thread for processing the image
+                thread = threading.Thread(target=process_image, args=(image, nets, labels, client_obj))
                 thread.start()
 
-                # Wait for thread result
+                # Wait for the thread to complete and get the result
                 thread.join()
-                client_obj = thread.result
 
                 if json['id']:
                     client_obj.update({
@@ -200,26 +223,10 @@ def upload_file():
 
             except Exception as e:
                 print("Exception {}".format(e))
+        else:
+            return jsonify({'error': "There is an error on detect image"}), 400
 
-        elif request.files['file']:
-            file = request.files['file']
-            image_data = file.read()
-            try:
-                image = np.frombuffer(image_data, np.uint8)
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                # TODO Load the neural net. Should be local to this method as its multi-threaded endpoint
-                nets = load_model(CFG, weights)
-                thread = threading.Thread(target=do_prediction, args=(image, nets, labels))
-                thread.start()
-
-                # Wait for the thread result
-                thread.join()
-                client_obj = thread.result
-
-            except Exception as e:
-                print("Exception {}".format(e))
-
-        return jsonify(client_obj)
+        return jsonify(client_obj.get('client_obj'))
 
 if __name__ == "__main__":
     if len(sys.argv) == 3:
