@@ -14,12 +14,10 @@ spec:
     spec:
       containers:
         - name: object-detection
-          image: object-detection:latest
+          image: mhaa0005/object-detection:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
-          env:
-            - name: FLASK_ENV
-              value: production
 
           resources:
             requests:
