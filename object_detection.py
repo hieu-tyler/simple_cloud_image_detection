@@ -190,15 +190,18 @@ def upload_file():
     if request.method == "POST":
         if "image" in request.files:
             file = request.files["image"]
-            image_data = file.read()
-            image_str = base64.b64encode(image_data).decode("utf-8")
+            try:
+                image_data = file.read()
+                image_str = base64.b64encode(image_data).decode("utf-8")
+            except:
+                return jsonify({"error": "Error processing image"}), 400
 
     return jsonify(
         {
             "id": str(uuid.uuid4()),
             "image": image_str,
         }
-    )
+    ), 200
 
 
 @app.route("/detect", methods=["POST"])
@@ -228,7 +231,7 @@ def detect_image():
                     client_obj.update({"id": json["id"]})
 
             except Exception as e:
-                print("Exception {}".format(e))
+                return jsonify({"error": "There is an error on detect image"}), 400
         else:
             return jsonify({"error": "There is an error on detect image"}), 400
 
