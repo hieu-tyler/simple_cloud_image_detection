@@ -127,11 +127,11 @@ def do_prediction(image, net, LABELS):
                 "label": LABELS[classIDs[i]],
                 "accuracy": confidences[i],
                 "rectangle": {
-                    "height": boxes[i][0], 
-                    "left": boxes[i][1], 
-                    "top": boxes[i][2], 
+                    "height": boxes[i][0],
+                    "left": boxes[i][1],
+                    "top": boxes[i][2],
                     "width": boxes[i][3],
-                }
+                },
             }
             output_obj.append(found_obj)
         print(output_obj)
@@ -145,6 +145,7 @@ def do_prediction(image, net, LABELS):
     print("client object", client_obj)
     return client_obj
 
+
 yolo_path = "yolo_tiny_configs/"
 
 ## Yolov3-tiny version
@@ -157,7 +158,6 @@ CFG = get_config(cfgpath)
 weights = get_weights(wpath)
 
 
-# TODO, you should make this console script into webservice using Flask
 def main():
     try:
         imagefile = str(sys.argv[2])
@@ -174,68 +174,75 @@ def main():
     except Exception as e:
         print("Exception {}".format(e))
 
+
 def process_image(image, nets, labels, result):
-    result.update({'client_obj': do_prediction(image, nets, labels)})
+    result.update({"client_obj": do_prediction(image, nets, labels)})
 
-@app.route('/')
+
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/upload', methods=['POST'])
+
+@app.route("/upload", methods=["POST"])
 def upload_file():
     image_str = ""
     if request.method == "POST":
-        if 'image' in request.files:
-            file = request.files['image']
+        if "image" in request.files:
+            file = request.files["image"]
             image_data = file.read()
-            image_str = base64.b64encode(image_data).decode('utf-8')
+            image_str = base64.b64encode(image_data).decode("utf-8")
 
-    return jsonify({
-        "id": str(uuid.uuid4()),
-        "image": image_str,
-    })
+    return jsonify(
+        {
+            "id": str(uuid.uuid4()),
+            "image": image_str,
+        }
+    )
 
-@app.route('/detect', methods=['POST'])
+
+@app.route("/detect", methods=["POST"])
 def detect_image():
-    if request.method == 'POST':
+    if request.method == "POST":
         json = request.json
         client_obj = {}
         if json:
-            img_object = json['image']
+            img_object = json["image"]
             try:
                 image_data = base64.b64decode(img_object)
                 nparr = np.frombuffer(image_data, np.uint8)
                 image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 # TODO: Load the neural net. Should be local to this method as its multi-threaded endpoint
                 nets = load_model(CFG, weights)
-                
+
                 # Create a new thread for processing the image
-                thread = threading.Thread(target=process_image, args=(image, nets, labels, client_obj))
+                thread = threading.Thread(
+                    target=process_image, args=(image, nets, labels, client_obj)
+                )
                 thread.start()
 
                 # Wait for the thread to complete and get the result
                 thread.join()
 
-                if json['id']:
-                    client_obj.update({
-                        "id": json['id']
-                    })
+                if json["id"]:
+                    client_obj.update({"id": json["id"]})
 
             except Exception as e:
                 print("Exception {}".format(e))
         else:
-            return jsonify({'error': "There is an error on detect image"}), 400
+            return jsonify({"error": "There is an error on detect image"}), 400
 
-        return jsonify(client_obj.get('client_obj'))
+        return jsonify(client_obj.get("client_obj"))
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 3:
         main()
     elif len(sys.argv) == 1:
-        app.run(host='0.0.0.0', port=5000, threaded=True)
+        app.run(host="0.0.0.0", port=5000, threaded=True)
     else:
         raise ValueError(
-                "Argument list is wrong. Please use the following format:  {} {} {}".format(
-                    "python iWebLens_server.py", "<yolo_config_folder>", "<Image file path>"
-                )
+            "Argument list is wrong. Please use the following format:  {} {} {}".format(
+                "python iWebLens_server.py", "<yolo_config_folder>", "<Image file path>"
             )
+        )
