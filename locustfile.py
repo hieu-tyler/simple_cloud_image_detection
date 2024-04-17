@@ -8,7 +8,7 @@ class MyUser(HttpUser):
 
     # Wait time configuration
     wait_time = between(1, 2)
-    image_dir_path = "images/"
+    image_dir_path = os.path.expanduser('~')
     host = "http://localhost:5000"
 
     def get_images(self):
@@ -31,36 +31,29 @@ class MyUser(HttpUser):
                 "id": "",
                 "image": encode_image
             }
-        self.client.post("/detect", json=payload)
+        
+        upload_response = self.client.post("/upload", files=payload)
+        if upload_response.status_code == 200:
+            image_json = upload_response.json()
+            self.client.post("/detect", json=image_json)
 
-    # @task
-    # def detect_all_images(self):
-    #     """
-    #         Accept json image string only
-    #     """
-    #     images_list = self.get_images()
-    #     for image in images_list:
-    #         image = open(image, "rb").read()
-    #         payload = {
-    #             "image": base64.b64encode(image).decode('utf-8')
-    #         }
-    #         self.client.post('/detect', json=payload)
-
-    # @task
-    def upload_image(self):
-        images_list = self.get_images()
-        chosen_image_path = random.choice(images_list)
-        chosen_image = open(chosen_image_path, "rb").read()
-        payload = {
-            "image": chosen_image
-        }
-        self.client.post("/upload", files=payload)
-
-    # @task
-    def upload_all_images(self):
+    @task    
+    def detect_all_images(self):
+        """
+            Accept json image string only
+        """
         images_list = self.get_images()
         for image in images_list:
-            payload = {
-                "image": image
-            }
-            self.client.post('/upload', files=payload)
+            image_obj = open(image, "rb").read()
+            if image_obj:
+                encode_image = base64.b64encode(image_obj).decode('utf-8')
+
+                payload = {
+                    "id": "",
+                    "image": encode_image
+                }
+        
+            upload_response = self.client.post("/upload", files=payload)
+            if upload_response.status_code == 200:
+                image_json = upload_response.json()
+                self.client.post("/detect", json=image_json)
