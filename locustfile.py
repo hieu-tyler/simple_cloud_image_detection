@@ -8,12 +8,11 @@ class MyUser(HttpUser):
 
     # Wait time configuration
     wait_time = between(1, 2)
-    image_dir_path = os.path.expanduser('~')
     host = "http://localhost:5000"
 
     def get_images(self):
-        current_dir = os.path.dirname(os.path.realpath(__file__))
-
+        current_dir = os.path.join(os.path.dirname(os.path.realpath(__name__)), "images/")
+    
         return [os.path.join(current_dir, image_path) \
                 for image_path in os.listdir(current_dir)]
 
@@ -45,8 +44,8 @@ class MyUser(HttpUser):
             Accept json image string only
         """
         images_list = self.get_images()
-        for image in images_list:
-            image_obj = open(image, "rb").read()
+        for image_path in images_list:
+            image_obj = open(image_path, "rb").read()
             if image_obj:
                 encode_image = base64.b64encode(image_obj).decode('utf-8')
 
