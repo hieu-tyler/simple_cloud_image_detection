@@ -8,13 +8,20 @@ import uuid
 import base64
 from flask import Flask, jsonify, request, render_template
 import threading
-from queue import Queue
 
 app = Flask(__name__)
 
 # construct the argument parse and parse the arguments
 confthres = 0.3
 nmsthres = 0.1
+
+current_dir = os.path.dirname(os.path.realpath(__file__))
+yolo_path = os.path.join(current_dir, "yolo_tiny_configs/")
+
+## Yolov3-tiny version
+labelsPath = "coco.names"
+cfgpath = "yolov3-tiny.cfg"
+wpath = "yolov3-tiny.weights"
 
 
 def get_labels(labels_path):
@@ -144,14 +151,6 @@ def do_prediction(image, net, LABELS):
         }
     print("client object", client_obj)
     return client_obj
-
-
-yolo_path = "yolo_tiny_configs/"
-
-## Yolov3-tiny version
-labelsPath = "coco.names"
-cfgpath = "yolov3-tiny.cfg"
-wpath = "yolov3-tiny.weights"
 
 labels = get_labels(labelsPath)
 CFG = get_config(cfgpath)

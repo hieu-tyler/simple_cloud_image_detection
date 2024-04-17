@@ -12,8 +12,10 @@ class MyUser(HttpUser):
     host = "http://localhost:5000"
 
     def get_images(self):
-        return [os.path.join(self.image_dir_path, image_path) \
-                for image_path in os.listdir(self.image_dir_path)]
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+
+        return [os.path.join(current_dir, image_path) \
+                for image_path in os.listdir(current_dir)]
 
     @task
     def detect_image(self):
@@ -52,7 +54,7 @@ class MyUser(HttpUser):
                     "id": "",
                     "image": encode_image
                 }
-        
+
             upload_response = self.client.post("/upload", files=payload)
             if upload_response.status_code == 200:
                 image_json = upload_response.json()
