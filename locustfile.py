@@ -8,7 +8,6 @@ class MyUser(HttpUser):
 
     # Wait time configuration
     wait_time = between(1, 2)
-    host = "http://localhost:5000"
 
     def get_images(self):
         current_dir = os.path.join(os.path.dirname(os.path.realpath(__name__)), "images/")
