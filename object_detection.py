@@ -227,7 +227,7 @@ def detect_image():
                 # Wait for the thread to complete and get the result
                 thread.join()
 
-                if json["id"]:
+                if json.get("id"):
                     client_obj.update({"id": json["id"]})
 
             except Exception as e:
@@ -235,7 +235,7 @@ def detect_image():
         else:
             return jsonify({"error": "There is an error on detect image"}), 400
 
-        return jsonify(client_obj.get("client_obj"))
+        return jsonify(client_obj.get("client_obj")), 200
 
 
 if __name__ == "__main__":
